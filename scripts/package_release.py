@@ -23,7 +23,7 @@ def main():
     archive = arguments.output / f'{name}.tar.gz'
     with tarfile.open(archive, 'w:gz') as output:
         output.add(arguments.binary, arcname=f'{name}/agentmesh')
-        for path in ['README.md', 'LICENSE', 'docs/architecture.md', 'docs/validation.md']:
+        for path in ['README.md', 'LICENSE', 'docs/architecture.md', 'docs/validation.md', 'docs/remote-workspaces.md']:
             output.add(root / path, arcname=f'{name}/{path}')
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     (arguments.output / f'{archive.name}.sha256').write_text(f'{digest}  {archive.name}\n')

@@ -23,20 +23,10 @@ pub struct State {
     pub db: Database,
     pub name: String,
     pub changed: Notify,
+    pub executor: crate::execution::Executor,
+    allowed_relay: Option<iroh::RelayUrl>,
+    relay_only: bool,
     shutdown: Notify,
-}
-
-pub fn private_dir(dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(dir)?;
-    let metadata = std::fs::symlink_metadata(dir)?;
-    ensure!(
-        metadata.is_dir()
-            && !metadata.file_type().is_symlink()
-            && std::os::unix::fs::MetadataExt::uid(&metadata) == unsafe { libc::geteuid() },
-        "data directory must be owned by current user and not a symlink"
-    );
-    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-    Ok(())
 }
 
 pub(crate) fn read_relay_token(path: &Path) -> Result<String> {
@@ -71,17 +61,34 @@ pub(crate) fn read_relay_token(path: &Path) -> Result<String> {
     Ok(token)
 }
 
-pub async fn run(
-    dir: PathBuf,
-    name: String,
-    relay: Option<String>,
-    relay_token_file: Option<PathBuf>,
-    no_relay: bool,
-    relay_only: bool,
-    bind_addr: String,
-) -> Result<()> {
+pub struct Options {
+    pub dir: PathBuf,
+    pub name: String,
+    pub relay: Option<String>,
+    pub relay_token_file: Option<PathBuf>,
+    pub no_relay: bool,
+    pub relay_only: bool,
+    pub bind_addr: String,
+    pub dns_server: Option<std::net::SocketAddr>,
+}
+
+pub async fn run(options: Options) -> Result<()> {
+    let Options {
+        dir,
+        name,
+        relay,
+        relay_token_file,
+        no_relay,
+        relay_only,
+        bind_addr,
+        dns_server,
+    } = options;
     validate_text(&name, "machine name", 128)?;
-    private_dir(&dir)?;
+    ensure!(
+        !relay_only || relay.is_some(),
+        "relay-only mode requires an explicit relay URL"
+    );
+    local::private_dir(&dir)?;
     let lock = OpenOptions::new()
         .create(true)
         .truncate(false)
@@ -110,6 +117,14 @@ pub async fn run(
             .write_all(&key.to_bytes())?;
         key
     };
+    let allowed_relay = if no_relay {
+        None
+    } else {
+        relay
+            .as_deref()
+            .map(str::parse::<iroh::RelayUrl>)
+            .transpose()?
+    };
     let relay_mode = if no_relay {
         RelayMode::Disabled
     } else if let Some(url) = relay {
@@ -120,9 +135,21 @@ pub async fn run(
         }
         RelayMode::Custom(RelayMap::from_iter([config]))
     } else {
-        RelayMode::Default
+        RelayMode::Disabled
     };
-    let builder = Endpoint::builder(presets::N0)
+    // Peers exchange explicit addresses in invitations/tickets. Do not publish
+    // node metadata or resolve peers through the public iroh.link directory.
+    let resolver = iroh::dns::DnsResolver::builder().disable_fallback();
+    let resolver = match dns_server {
+        Some(server) => resolver.add_nameserver_config(
+            iroh::dns::NameserverConfig::udp(server.ip()).with_port(server.port()),
+        ),
+        None => resolver.with_system_defaults(),
+    }
+    .build();
+    let builder = Endpoint::builder(presets::Minimal)
+        .clear_address_lookup()
+        .dns_resolver(resolver)
         .secret_key(key)
         .relay_mode(relay_mode)
         .alpns(vec![ALPN.to_vec()])
@@ -135,6 +162,9 @@ pub async fn run(
     let endpoint = builder.bind().await?;
     let db = Database::open(&dir.join("mailbox.sqlite"), endpoint.id().to_string())?;
     let state = Arc::new(State {
+        allowed_relay,
+        relay_only,
+        executor: crate::execution::Executor::open(&dir)?,
         endpoint,
         db,
         name,
@@ -187,6 +217,7 @@ pub async fn run(
             }
         }
     }
+    state.executor.shutdown().await;
     peer_task.abort();
     network_task.abort();
     delivery_task.abort();
@@ -197,6 +228,101 @@ pub async fn run(
 }
 
 impl State {
+    async fn authorize_lease(&self, lease: Option<ExecutionLease>) -> Result<()> {
+        if let Some(lease) = lease {
+            self.db
+                .run(move |db| db.authorize(&lease.id, &lease.execution))
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn resolve_machine(&self, name: &str) -> Result<Ticket> {
+        let local = self.ticket();
+        let mut peers = self.db.run(|db| db.peers()).await?;
+        peers.push(local.clone());
+        if name == "local" {
+            return Ok(local);
+        }
+        let mut found = peers
+            .into_iter()
+            .filter(|p| p.address.id.to_string() == name || p.name == name);
+        let peer = found
+            .next()
+            .context("machine not found; use peer list or an endpoint ID")?;
+        ensure!(
+            found.next().is_none(),
+            "ambiguous machine name; use an endpoint ID"
+        );
+        Ok(peer)
+    }
+
+    async fn workspace_call(
+        &self,
+        node: String,
+        request: WorkspaceOperation,
+        administrator: bool,
+    ) -> Result<Value> {
+        let peer = self.resolve_machine(&node).await?;
+        if peer.address.id == self.endpoint.id() {
+            self.executor
+                .handle(self.endpoint.id().to_string(), request, administrator)
+                .await
+        } else {
+            self.remote(peer, RemoteRequest::Workspace { request })
+                .await
+        }
+    }
+
+    async fn workspaces(&self, node: Option<String>, administrator: bool) -> Result<Value> {
+        let peers = if let Some(node) = node {
+            vec![self.resolve_machine(&node).await?]
+        } else {
+            let mut peers = self.db.run(|db| db.peers()).await?;
+            peers.push(self.ticket());
+            peers
+        };
+        let mut waiting = peers
+            .iter()
+            .map(|p| p.address.id.to_string())
+            .collect::<std::collections::BTreeSet<_>>();
+        let mut requests = stream::iter(peers.into_iter().map(|p| async move {
+            let node = p.address.id.to_string();
+            let result = self
+                .workspace_call(node.clone(), WorkspaceOperation::List, administrator)
+                .await;
+            (node, p.name, result)
+        }))
+        .buffer_unordered(8);
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(12);
+        let mut machines = vec![];
+        let mut unreachable = vec![];
+        let mut bytes = 0;
+        let mut truncated = false;
+        while let Ok(Some((node, name, result))) =
+            tokio::time::timeout_at(deadline, requests.next()).await
+        {
+            waiting.remove(&node);
+            match result {
+                Ok(result) => {
+                    let entry = json!({"node":node,"name":name,"workspaces":result["workspaces"]});
+                    bytes += serde_json::to_vec(&entry)?.len();
+                    if bytes < MAX_FRAME / 2 {
+                        machines.push(entry);
+                    } else {
+                        truncated = true;
+                    }
+                }
+                Err(error) => {
+                    unreachable.push(json!({"node":node,"name":name,"error":error.to_string()}))
+                }
+            }
+        }
+        for node in waiting {
+            unreachable.push(json!({"node":node,"error":"discovery deadline exceeded"}));
+        }
+        Ok(json!({"machines":machines,"unreachable":unreachable,"truncated":truncated}))
+    }
     fn ticket(&self) -> Ticket {
         Ticket {
             version: 1,
@@ -351,13 +477,36 @@ impl State {
 
     async fn handle(&self, request: Request) -> Result<Value> {
         match request {
+            Request::WorkspaceAdmin { mut command } => {
+                match &mut command {
+                    WorkspaceAdmin::Grant { peer, .. } | WorkspaceAdmin::Revoke { peer, .. } => {
+                        *peer = self.resolve_machine(peer).await?.address.id.to_string();
+                    }
+                    _ => (),
+                }
+                self.executor.admin(command).await
+            }
+            Request::WorkspaceList { node, lease } => {
+                let administrator = lease.is_none();
+                self.authorize_lease(lease).await?;
+                self.workspaces(node, administrator).await
+            }
+            Request::WorkspaceCall {
+                node,
+                request,
+                lease,
+            } => {
+                let administrator = lease.is_none();
+                self.authorize_lease(lease).await?;
+                self.workspace_call(node, request, administrator).await
+            }
             Request::Shutdown => Ok(json!({"stopping":true})),
             Request::RelayCheck => {
                 tokio::time::timeout(Duration::from_secs(12),self.endpoint.online()).await.context("no relay handshake completed within 12 seconds; check relay URL, TLS trust and protocol version")?;
                 Ok(json!({"connected":true,"address":self.endpoint.addr()}))
             }
             Request::Status => Ok(
-                json!({"version":env!("CARGO_PKG_VERSION"),"node":self.endpoint.id().to_string(),"name":self.name,"pid":std::process::id(),"address":self.endpoint.addr()}),
+                json!({"version":env!("CARGO_PKG_VERSION"),"node":self.endpoint.id().to_string(),"name":self.name,"pid":std::process::id(),"address":self.endpoint.addr(),"public_discovery":false,"public_dns_fallback":false}),
             ),
             Request::Ticket => {
                 let ticket = Ticket {
@@ -461,7 +610,18 @@ impl State {
             Request::Deliveries => self.db.run(|db| db.deliveries()).await,
         }
     }
-    async fn remote(&self, peer: Ticket, request: RemoteRequest) -> Result<Value> {
+    async fn remote(&self, mut peer: Ticket, request: RemoteRequest) -> Result<Value> {
+        // A custom home relay map does not constrain relay URLs advertised by peers.
+        // Filter every dial, including persisted tickets, invitations and membership sync.
+        peer.address.addrs.retain(|address| match address {
+            iroh::TransportAddr::Relay(url) => self.allowed_relay.as_ref() == Some(url),
+            iroh::TransportAddr::Ip(_) => !self.relay_only,
+            _ => false,
+        });
+        ensure!(
+            !peer.address.addrs.is_empty(),
+            "peer has no address permitted by the local transport policy"
+        );
         tokio::time::timeout(Duration::from_secs(8), async {
             let conn = self.endpoint.connect(peer.address, ALPN).await?;
             let (mut send, mut recv) = conn.open_bi().await?;
@@ -503,6 +663,10 @@ async fn accept_peers(state: Arc<State>) {
                         let request: RemoteRequest =
                             serde_json::from_slice(&recv.read_to_end(MAX_FRAME).await?)?;
                         match request {
+                            RemoteRequest::Workspace { request } => {
+                                ensure!(trusted, "unpaired peer");
+                                state.executor.handle(peer.clone(), request, false).await
+                            }
                             RemoteRequest::Join { secret, member } => {
                                 ensure!(
                                     member.address.id.to_string() == peer,

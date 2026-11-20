@@ -22,6 +22,17 @@ class NativeBinding(unittest.TestCase):
         self.assertFalse(identity.get('isError'))
         self.assertTrue(rpc(node['dir'],op='directory')['sessions'][0]['wake'])
         calls={'whoami':{},'check_inbox':{},'send_message':{'to':[client.session['address']],'body':'must not enqueue'},'acknowledge_messages':{'messages':[]},'set_group':{'name':'must-not-save','members':[client.session['address']]},'list_groups':{},'list_sessions':{}}
+        calls.update({
+            'remote_workspaces': {},
+            'remote_list_files': {'node':'local','workspace':'test'},
+            'remote_read_file': {'node':'local','workspace':'test','path':'test'},
+            'remote_write_file': {'node':'local','workspace':'test','path':'test','content':'test'},
+            'remote_search': {'node':'local','workspace':'test','query':'test'},
+            'remote_execute': {'node':'local','workspace':'test','command':'true','request_id':'fenced'},
+            'remote_job': {'node':'local','job':str(uuid.uuid4())},
+            'remote_jobs': {'node':'local','workspace':'test'},
+            'remote_cancel_job': {'node':'local','job':str(uuid.uuid4())},
+        })
         for tool,args in calls.items():
             for metadata in [{},{'threadId':str(uuid.uuid4())}]:
                 with self.subTest(tool=tool,metadata=bool(metadata)):

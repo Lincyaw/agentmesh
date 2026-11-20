@@ -94,3 +94,27 @@ requirements:
     code: [{path: site/index.html}, {path: site/app.js}, {path: promo/lecture.json}, {path: .github/workflows/pages.yml}, {path: .github/workflows/release.yml}, {path: scripts/package_release.py}]
     tests: [{path: scripts/check_site.py}]
     docs: [{path: README.md}, {path: promo/README.md}, {path: docs/releases/v0.3.0.md}]
+  - id: REQ-012
+    title: Explicitly authorized remote workspaces
+    priority: P0
+    status: tested
+    description: Local coding agents discover granted workspaces and perform bounded text file, listing and search operations through authenticated iroh, retaining harness approval and execution leases.
+    code: [{path: src/execution.rs}, {path: src/workspace_files.rs}, {path: src/protocol.rs}, {path: src/daemon.rs}, {path: src/mcp.rs}, {path: src/main.rs}]
+    tests: [{path: tests/test_remote.py}, {path: tests/test_auto_binding.py}]
+    docs: [{path: README.md}, {path: docs/remote-workspaces.md}, {path: docs/architecture.md}]
+  - id: REQ-013
+    title: Durable remote command jobs
+    priority: P0
+    status: tested
+    description: Explicit execute grants permit asynchronous jobs with caller-scoped request deduplication, persisted bounded output, UTF-8-safe byte cursors, timeout/cancellation, revocation, and interruption without replay after restart.
+    code: [{path: src/execution.rs}, {path: src/daemon.rs}, {path: src/mcp.rs}, {path: src/main.rs}]
+    tests: [{path: tests/test_remote.py}]
+    docs: [{path: docs/remote-workspaces.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-014
+    title: Private relay and discovery policy
+    priority: P0
+    status: tested
+    description: Disable public discovery, publication, default relays and DNS fallback; permit only explicitly configured relay URLs, including imported peer and invitation hints, and support a private DNS server.
+    code: [{path: src/daemon.rs}, {path: src/setup.rs}, {path: src/main.rs}]
+    tests: [{path: tests/test_transport.py}, {path: tests/test_setup.py}, {path: tests/test_cli.py}, {path: scripts/check_private_relay.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]

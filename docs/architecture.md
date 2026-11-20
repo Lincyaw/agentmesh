@@ -55,7 +55,9 @@ Socket paths, harness credentials and wake tokens stay on the local machine.
 The custom ALPN is `agentmesh/messages/1`.
 Bounded JSON requests use one bidirectional QUIC stream per operation.
 Remote operations cover invitation redemption, authenticated network-member synchronization, session-directory queries and message delivery.
-Remote callers cannot invoke arbitrary MCP tools or shell commands.
+Remote callers cannot invoke arbitrary MCP tools or local administrative operations.
+Workspace operations additionally require explicit per-peer grants on the executor.
+An execute grant permits shell commands with that daemon account's permissions.
 The receiver verifies that the message sender's machine matches the authenticated connection identity.
 The message recipient must be an existing local session.
 
@@ -65,10 +67,47 @@ Messages are deduplicated by sender identity, message ID and recipient.
 Retries after a lost receipt reuse the same immutable message.
 Transport delivery, application acknowledgement and a reply are distinct concepts.
 An offline recipient machine has no relay mailbox: messages remain in the sender's outbox and retry when both daemons are online.
-The iroh transport can use public discovery and encrypted relay infrastructure when a direct path is unavailable.
+The iroh transport uses explicit peer addresses and an optionally configured self-hosted relay.
+The Minimal endpoint preset has no public node address lookup or publication.
+No public relay is selected by default, and DNS fallback resolvers are disabled.
+The system resolver (or an explicit private DNS server) resolves only required hostnames, such as the configured relay.
+Every outgoing call filters peer addresses against the configured relay URL, even
+when a persisted ticket, invitation or synchronized member advertises another relay.
+Relay-only mode also filters direct addresses; a peer with no permitted address fails
+before a network dial. Invalid relay-only or DNS profiles fail before daemon upgrade
+can stop the previous version.
 The application has no central server.
 An optional custom relay can use a shared token supplied through a private, owner-controlled file.
 The token stays on the local machine and is excluded from pairing tickets and error output.
+
+## Remote workspaces and jobs
+
+The executor uses a separate private `execution.sqlite` database for workspace roots,
+per-machine grants, and durable job records; mailbox delivery never replays execution.
+Only owner-side Unix IPC exposes workspace administration. An iroh peer is always
+identified from its authenticated connection, and session MCP requests carry their
+execution lease. Enrollment, membership gossip, and messages do not add grants.
+
+Read/write tools resolve paths relative to directory descriptors with `O_NOFOLLOW`.
+They reject parent traversal, special files and oversized or non-UTF-8 text.
+File replacement checks the previous content hash and publishes by atomic rename;
+create-only writes use no-replace publication. This serializes Agentmesh writers,
+while independent local writers and shell jobs must coordinate their own edits.
+
+Command admission persists `(caller machine, request ID, inputs)` before spawning.
+The detached admission task completes even if its RPC caller disconnects.
+Repeated inputs return the same job, while conflicting reuse fails.
+Each job has a process group, a timeout, separate bounded output files and byte cursors.
+Pipe drains run concurrently. After a process ends or is killed, inherited pipes have
+a bounded drain grace period, then are closed with explicit incomplete-output flags.
+Output chunks retain incomplete UTF-8 suffixes for the next read.
+Daemon restart marks unfinished jobs interrupted and never respawns them.
+
+Execute permission grants account-level access, rather than a directory sandbox.
+Revocation cancels that machine's active jobs and rejects future workspace requests.
+Jobs are shared by sessions on their originating machine and hidden from other machines.
+The nine remote MCP tools retain normal harness approvals; setup still auto-grants
+only the seven communication tools. See [Remote workspaces](remote-workspaces.md).
 
 ## Groups
 

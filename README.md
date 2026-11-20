@@ -50,6 +50,26 @@ Tell your agent, for example:
 
 > Find the Codex session on my server. Ask it to review the migration and reply here with the result.
 
+## Remote environments
+
+Operate files and run commands on another enrolled machine while keeping your Claude
+or Codex session local. On the remote machine:
+
+```sh
+agentmesh workspace add --name project --path /srv/project
+agentmesh workspace grant --name project --peer laptop --write --execute
+```
+
+Then ask your local agent to discover remote workspaces, inspect the project, and run
+its tests. All four CLIs receive the same nine `remote_*` MCP tools after upgrading
+with `agentmesh setup` and reconnecting MCP. Remote jobs persist their output and
+support cancellation and idempotent submission. Access is explicitly granted per
+machine; execute permission uses the remote daemon account, without an OS sandbox.
+Native harness file and shell tools continue to operate locally.
+
+See [Remote workspaces](docs/remote-workspaces.md) for permissions, tools, CLI usage,
+limits, and recovery.
+
 ## What you can do
 
 - **Find sessions** on this machine and other machines in your network.
@@ -73,7 +93,8 @@ flowchart LR
 
 A machine has one persistent iroh identity and a local SQLite mailbox.
 Every MCP bridge owns a distinct session and execution lease.
-Direct connections are preferred; iroh can use encrypted relay transport when a direct path is unavailable.
+Direct connections are preferred; an explicitly configured self-hosted relay can carry encrypted traffic when a direct path is unavailable.
+Public relays, public node discovery, and automatic fallback DNS resolvers are disabled.
 Agentmesh has no central application server or hosted mailbox.
 
 Network members share an enrollment credential and should be machines you trust.
@@ -151,7 +172,7 @@ Run a foreground daemon explicitly when you want to supervise it yourself:
 agentmesh daemon run --name server --bind-addr 0.0.0.0:43291
 ```
 
-To use a custom iroh relay:
+Configure your self-hosted iroh relay for machines on different networks. No public relay is selected automatically:
 
 ```sh
 agentmesh daemon run --name server \
@@ -161,8 +182,9 @@ agentmesh relay check
 ```
 
 The token file must be private and owned by the current user.
-For lazy startup, the data directory's `daemon.json` supports `relay_url`, `relay_token_file`, `relay_only`, and `no_relay` alongside `name` and `bind_addr`.
-TLS verification remains enabled.
+For lazy startup, the data directory's `daemon.json` supports `relay_url`, `relay_token_file`, `relay_only`, `no_relay`, and an optional `dns_server` (`IP:port`) alongside `name` and `bind_addr`.
+TLS verification remains enabled. Relay DNS uses the system resolver or `--dns-server IP:port`, with public fallback resolvers disabled.
+Agentmesh does not publish or resolve node addresses through `iroh.link`; invitations and peer tickets supply those addresses.
 A relay is transport infrastructure; it does not store messages for an offline machine.
 
 Manual public-ticket pairing and native session attachment remain available for diagnostics and custom integrations:
@@ -196,6 +218,8 @@ python3 tests/test_setup.py
 python3 tests/test_invites.py
 python3 tests/test_auto_binding.py
 python3 tests/test_cli.py
+python3 tests/test_remote.py
+python3 tests/test_transport.py
 ```
 
 The regression suite covers actual iroh nodes and MCP processes, enrollment, session isolation, private messages, replies, groups, offline recovery, duplicate prevention, and bounded pagination.

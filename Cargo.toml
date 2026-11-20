@@ -1,9 +1,9 @@
 [package]
 name = "agentmesh"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version = "1.94"
-description = "Local MCP mailboxes for coding sessions over iroh peer-to-peer connections"
+description = "Peer-to-peer MCP mailboxes and remote workspaces for coding agents"
 license = "MIT"
 
 [dependencies]

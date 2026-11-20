@@ -2,6 +2,8 @@ import concurrent.futures
 import json
 from pathlib import Path
 import subprocess
+import socket
+import threading
 import tempfile
 import unittest
 
@@ -9,6 +11,45 @@ from test_interop import BINARY, McpClient, rpc, wait_for
 
 
 class SharedSetup(unittest.TestCase):
+    def test_invalid_private_transport_profile_preserves_old_daemon(self):
+        with tempfile.TemporaryDirectory(prefix='am-upgrade-', dir='/tmp') as root:
+            root = Path(root)
+            directory, config = root / 'node', root / 'home'
+            prepared = self.invoke(directory, config, '--config-only')
+            self.assertEqual(prepared.returncode, 0, prepared.stderr)
+            requests = []
+            stopping = threading.Event()
+            with socket.socket(socket.AF_UNIX) as server:
+                server.bind(str(directory / 'daemon.sock'))
+                server.listen(8)
+                server.settimeout(0.1)
+                def serve_old_version():
+                    while not stopping.is_set():
+                        try:
+                            client, _ = server.accept()
+                        except socket.timeout:
+                            continue
+                        with client:
+                            request = json.loads(client.makefile('rb').readline())
+                            requests.append(request['op'])
+                            value = {'ok': True, 'result': {'version': '0.0.0'}}
+                            client.sendall(json.dumps(value).encode() + b'\n')
+                thread = threading.Thread(target=serve_old_version, daemon=True)
+                thread.start()
+                try:
+                    for invalid, message in [({'relay_only': True}, 'relay_url'), ({'dns_server': 'invalid'}, 'DNS server')]:
+                        (directory / 'daemon.json').write_text(json.dumps({'name': 'old-daemon', **invalid}))
+                        result = subprocess.run([str(BINARY), '--data-dir', str(directory), 'remote', 'list'], capture_output=True, text=True, timeout=10)
+                        self.assertNotEqual(result.returncode, 0)
+                        self.assertEqual(result.stdout, '')
+                        self.assertIn(message, result.stderr)
+                    self.assertTrue(requests)
+                    self.assertEqual(set(requests), {'status'})
+                    self.assertEqual(rpc(directory, op='status')['version'], '0.0.0')
+                finally:
+                    stopping.set()
+                    thread.join(timeout=2)
+
     def test_lazy_daemon_child_is_reaped_while_session_parent_is_alive(self):
         with tempfile.TemporaryDirectory(prefix='am-setup-',dir='/tmp') as root:
             root=Path(root);directory,config=root/'node',root/'home'

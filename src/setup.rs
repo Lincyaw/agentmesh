@@ -179,7 +179,7 @@ pub fn install(
     if dry_run {
         return Ok(result);
     }
-    daemon::private_dir(dir)?;
+    local::private_dir(dir)?;
     std::fs::create_dir_all(binary.parent().unwrap())?;
     let current = std::env::current_exe()?;
     if current != binary {
@@ -490,7 +490,7 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
     address
         .parse::<std::net::SocketAddr>()
         .context("invalid daemon bind address")?;
-    for field in ["relay_url", "relay_token_file"] {
+    for field in ["relay_url", "relay_token_file", "dns_server"] {
         ensure!(
             profile.get(field).is_none_or(|v| v.is_string()),
             "daemon profile {field} must be a string"
@@ -505,6 +505,15 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
     if let Some(url) = profile["relay_url"].as_str() {
         url.parse::<iroh::RelayUrl>().context("invalid relay URL")?;
     }
+    if let Some(server) = profile["dns_server"].as_str() {
+        server
+            .parse::<std::net::SocketAddr>()
+            .context("invalid daemon DNS server")?;
+    }
+    ensure!(
+        profile["relay_only"].as_bool() != Some(true) || profile.get("relay_url").is_some(),
+        "relay_only requires an explicit relay_url"
+    );
     ensure!(
         !(profile["no_relay"].as_bool() == Some(true)
             && (profile.get("relay_url").is_some()
@@ -542,6 +551,7 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
     for (field, flag) in [
         ("relay_url", "--relay-url"),
         ("relay_token_file", "--relay-token-file"),
+        ("dns_server", "--dns-server"),
     ] {
         if let Some(value) = profile[field].as_str() {
             command.args([flag, value]);

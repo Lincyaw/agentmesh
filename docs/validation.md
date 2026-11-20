@@ -8,14 +8,66 @@ Validated on 20 November 2026 with macOS arm64, Rust, iroh 1.5.0, rmcp 3.11.0, S
 | Rust requirement regressions | 5 passed | `cargo test --locked`. |
 | Independent iroh nodes and MCP sessions | 7 passed | `python3 tests/test_interop.py`. |
 | CLI contracts and relay-token handling | 3 passed | `python3 tests/test_cli.py`. |
-| Configuration merging and daemon lifecycle | 4 passed | `python3 tests/test_setup.py`. |
+| Configuration merging and daemon lifecycle | 5 passed | `python3 tests/test_setup.py`. |
 | Invitation enrollment and member synchronization | 2 passed | `python3 tests/test_invites.py`. |
-| Native thread isolation | 1 passed | `python3 tests/test_auto_binding.py`; all seven tools reject mismatched or missing thread metadata after binding. |
+| Native thread isolation | 1 passed | `python3 tests/test_auto_binding.py`; all 16 tools reject mismatched or missing thread metadata after binding. |
 | Public relay-only transport | Passed | Disabled IP transports, then exchanged messages, replies, groups, and restart deliveries through a public iroh relay. |
 | Official Claude Code | MCP connection passed | Claude Code 2.1.328 reported Connected. |
 | tclaude | Automatic binding and idle model exchange passed | tclaude 0.1.10 / Claude Code 2.1.303: read, reply, and acknowledgement using setup-generated communication permissions. |
 | Official Codex | Automatic binding and idle model exchange passed | Codex 0.169.0-alpha.11.1: two real CLI sessions, target read/reply/ack, other inbox empty. |
 | tcodex | Automatic binding, MCP exchange, and queue submission passed | tcodex 0.1.4 / Codex 0.154.0; the configured model returned upstream HTTP 429 in the model-level test. |
+
+## Remote workspace validation (v0.4)
+
+The remote workspace suite passes 10 end-to-end checks using independent iroh nodes
+and actual MCP subprocesses:
+
+- Explicit default-deny grants, read/write/execute separation, and cross-machine job ownership.
+- All four harness labels expose the same tools and read remote files.
+- Unicode text, atomic create/replace, stale-hash rejection, literal search and directory listing.
+- Parent traversal, absolute paths, symlinks, special files, oversized text and invalid UTF-8 rejection.
+- Lost submission responses and matching retries execute exactly once; conflicting IDs fail.
+- Asynchronous status, stdout/stderr cursors, disconnect/reconnect and nonzero exit codes.
+- Timeout, cancellation, revocation and process-group cleanup.
+- Per-stream output caps, bounded frames, and malformed cursor rejection.
+- Restart persistence and interrupted jobs without replay.
+- Detached descendants cannot pin pipe capture; UTF-8 survives page and live-write boundaries.
+
+The existing 23 regression checks and one transport privacy check also pass, for **34 checks total**. Formatting,
+Clippy with warnings denied, and the optimized macOS build pass. Independent review
+found and verified fixes for the inherited-pipe and UTF-8 pagination cases, then
+approved the change. Native thread fencing now covers all 16 tools.
+
+These harness-label tests exercise real MCP processes, rather than four separate
+model-generation checks. The earlier model validation below applies to messaging.
+
+## Private transport (v0.4)
+
+A real local DNS responder records zero queries for an endpoint using the default
+configuration. With an explicitly configured test relay, it records only that relay's
+hostname, even when peer tickets and invitations advertise unapproved domain or
+literal-IP relay URLs. The endpoint uses the Minimal preset, no address lookup services, and no
+public relay map; its DNS resolver disables public fallback nameservers.
+`python3 tests/test_transport.py` checks those observable DNS behavior boundaries.
+
+A locally hosted iroh-relay 1.5.0 server binds only to loopback and requires a random
+shared token. Both Agentmesh endpoints use `--relay-only`, with all direct IP
+transports disabled. The invitation, remote-workspace and messaging suites passed all 19 cases
+through that relay, and an incorrect-token rejection check passed, for 20 checks. This exercises a real
+relay process and the same seven-plus-nine MCP tools; it does not claim a deployment
+across separate physical machines. Reproduce with:
+
+```sh
+python3 scripts/check_private_relay.py --relay-binary /absolute/path/to/iroh-relay
+```
+
+The loopback-only fixture uses HTTP dev mode for the outer transport. Iroh peer
+traffic remains encrypted end to end; deployed relay connections retain normal TLS
+certificate verification. Test credentials and relay data are temporary and removed
+when the runner exits.
+
+The public-relay result below is historical evidence from v0.3, before this private-only
+policy. No public relay is used in v0.4 validation.
 
 ## Transport and persistence
 
@@ -29,21 +81,16 @@ Old bridge processes cannot remove a successor's execution credentials.
 Large inboxes, groups, and directories are paginated within byte budgets.
 Discovery preserves local results when many remote peers are unreachable.
 
-Relay-only verification disables both endpoints' IP transports:
+Historical v0.3 relay-only checks disabled both endpoints' IP transports and passed
+through a public relay. Those checks were performed before the private-only v0.4
+transport policy and are not repeated for this version.
 
-```sh
-AGENTMESH_RELAY_URL=https://use1-1.relay.n0.iroh.link \
-AGENTMESH_RELAY_ONLY=1 \
-python3 tests/test_interop.py Interoperability.test_iroh_mcp_direct_reply_groups_and_restart
-```
-
-These checks use independent processes on one physical host and a public relay.
-They do not constitute a deployment across separate physical machines.
-Linux release builds and native regression checks run in the release workflow; consult its actual result for a published tag.
-
-An optional self-hosted relay was inspected for TLS and token-based authentication.
-Its end-to-end transport check was blocked by hostname resolution, so that custom deployment is not claimed as verified.
-No operator credentials or deployment inventory are part of this repository.
+An optional self-hosted relay was previously inspected for TLS and token-based
+authentication. The supplied host became unreachable during isolated offline build preparation;
+SSH and relay TLS handshakes time out. Work on that host was stopped at the user's
+request; current forced-relay checks use a locally hosted relay. No operator credentials or deployment inventory
+are part of this repository. Linux release checks run in the release workflow; consult
+its actual result for a published tag.
 
 ## Invitations and native attachment
 

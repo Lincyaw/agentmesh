@@ -1,6 +1,73 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WorkspaceAdmin {
+    Add {
+        name: String,
+        path: String,
+    },
+    List,
+    Grant {
+        name: String,
+        peer: String,
+        write: bool,
+        execute: bool,
+    },
+    Revoke {
+        name: String,
+        peer: String,
+    },
+    Remove {
+        name: String,
+    },
+    Prune,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WorkspaceOperation {
+    List,
+    ListFiles {
+        workspace: String,
+        path: String,
+    },
+    ReadFile {
+        workspace: String,
+        path: String,
+    },
+    WriteFile {
+        workspace: String,
+        path: String,
+        content: String,
+        expected_sha256: Option<String>,
+    },
+    Search {
+        workspace: String,
+        path: String,
+        query: String,
+    },
+    Execute {
+        workspace: String,
+        path: String,
+        command: String,
+        request_id: String,
+        timeout_seconds: u64,
+    },
+    Jobs {
+        workspace: String,
+    },
+    Job {
+        job: String,
+        stdout_cursor: u64,
+        stderr_cursor: u64,
+    },
+    CancelJob {
+        job: String,
+    },
+}
+
 pub const ALPN: &[u8] = b"agentmesh/messages/1";
 pub const MAX_FRAME: usize = 2 * 1024 * 1024;
 pub const LEASE_MS: i64 = 45_000;
@@ -60,6 +127,13 @@ pub struct Registration {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExecutionLease {
+    pub id: String,
+    pub execution: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DirectoryPage {
     pub sessions: Vec<Session>,
     pub next_cursor: Option<String>,
@@ -107,6 +181,18 @@ pub struct Outgoing {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    WorkspaceAdmin {
+        command: WorkspaceAdmin,
+    },
+    WorkspaceList {
+        node: Option<String>,
+        lease: Option<ExecutionLease>,
+    },
+    WorkspaceCall {
+        node: String,
+        lease: Option<ExecutionLease>,
+        request: WorkspaceOperation,
+    },
     Shutdown,
     Status,
     RelayCheck,
@@ -166,6 +252,7 @@ pub enum Request {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum RemoteRequest {
+    Workspace { request: WorkspaceOperation },
     Join { secret: String, member: Ticket },
     NetworkSync { network: Network, member: Ticket },
     Directory { after: Option<String> },

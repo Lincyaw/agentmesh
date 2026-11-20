@@ -1,4 +1,5 @@
 mod daemon;
+mod execution;
 mod local;
 mod mcp;
 mod network;
@@ -6,6 +7,7 @@ mod protocol;
 mod setup;
 mod store;
 mod wake;
+mod workspace_files;
 
 use anyhow::{Context, Result, ensure};
 use clap::{Parser, Subcommand};
@@ -26,6 +28,12 @@ struct Cli {
 }
 #[derive(Subcommand)]
 enum Command {
+    /// Publish directories and manage access on this machine.
+    #[command(subcommand)]
+    Workspace(WorkspaceCommand),
+    /// Operate an authorized workspace over iroh. All output is JSON.
+    #[command(subcommand)]
+    Remote(RemoteCommand),
     #[command(subcommand)]
     Invite(InviteCommand),
     /// Join using a private invitation read from stdin, a file, or AGENTMESH_INVITE_CODE.
@@ -71,6 +79,136 @@ enum Command {
 }
 
 #[derive(Subcommand)]
+enum WorkspaceCommand {
+    /// Publish an existing directory without granting remote access.
+    Add {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        path: PathBuf,
+    },
+    /// List locally published workspaces and grants.
+    List,
+    /// Replace a paired machine's grant; reading is always included.
+    Grant {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        peer: String,
+        #[arg(long)]
+        write: bool,
+        /// Allow commands with this daemon account's permissions (not sandboxed).
+        #[arg(long)]
+        execute: bool,
+    },
+    /// Revoke access and cancel this machine's active jobs in the workspace.
+    Revoke {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        peer: String,
+    },
+    /// Unpublish a workspace and cancel active jobs; leaves workspace files intact.
+    Remove {
+        #[arg(long)]
+        name: String,
+    },
+    /// Delete completed job records and output. Removed request IDs can run again.
+    Prune,
+}
+
+#[derive(Subcommand)]
+enum RemoteCommand {
+    /// Discover authorized workspaces. Omit --node to query all paired machines.
+    List {
+        #[arg(long)]
+        node: Option<String>,
+    },
+    /// List up to 200 entries without following symlinks.
+    Files {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+        #[arg(long, default_value = ".")]
+        path: String,
+    },
+    /// Read a UTF-8 file (64 KiB maximum), including its SHA-256.
+    Read {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+        #[arg(long)]
+        path: String,
+    },
+    /// Atomically create or replace a UTF-8 file. Read first to obtain its hash.
+    Write {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+        #[arg(long)]
+        path: String,
+        #[arg(long)]
+        content_file: PathBuf,
+        #[arg(long)]
+        expected_sha256: Option<String>,
+    },
+    /// Search UTF-8 files for literal text, with bounded results.
+    Search {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+        #[arg(long, default_value = ".")]
+        path: String,
+        #[arg(long)]
+        query: String,
+    },
+    /// Start a job; retry the SAME request ID after an uncertain response.
+    Execute {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+        #[arg(long, default_value = ".")]
+        path: String,
+        #[arg(long)]
+        command: String,
+        #[arg(long)]
+        request_id: String,
+        #[arg(long, default_value_t = 300)]
+        timeout_seconds: u64,
+    },
+    /// Read job status and output from byte cursors. Use --node local for administration.
+    Job {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        job: String,
+        #[arg(long, default_value_t = 0)]
+        stdout_cursor: u64,
+        #[arg(long, default_value_t = 0)]
+        stderr_cursor: u64,
+    },
+    /// List the most recent 100 jobs belonging to this machine.
+    Jobs {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        workspace: String,
+    },
+    /// Cancel a job and kill its process group.
+    Cancel {
+        #[arg(long)]
+        node: String,
+        #[arg(long)]
+        job: String,
+    },
+}
+
+#[derive(Subcommand)]
 enum InviteCommand {
     /// Create a single-use invitation, valid for ten minutes by default.
     Create {
@@ -98,10 +236,13 @@ enum Daemon {
         relay_token_file: Option<PathBuf>,
         #[arg(long)]
         no_relay: bool,
-        #[arg(long, conflicts_with = "no_relay")]
+        #[arg(long, conflicts_with = "no_relay", requires = "relay_url")]
         relay_only: bool,
         #[arg(long, default_value = "0.0.0.0:43291")]
         bind_addr: String,
+        /// Use this DNS server for relay hostnames instead of system DNS. No public fallback.
+        #[arg(long)]
+        dns_server: Option<std::net::SocketAddr>,
     },
 }
 #[derive(Subcommand)]
@@ -214,7 +355,120 @@ async fn execute(cli: Cli) -> Result<()> {
             .join("agentmesh")
     });
     let dir = std::path::absolute(dir)?;
+    if matches!(&cli.command, Command::Workspace(_) | Command::Remote(_))
+        && dir.join("daemon.json").exists()
+    {
+        setup::ensure_daemon(&dir).await?;
+    }
     let request = match cli.command {
+        Command::Workspace(command) => {
+            let command = match command {
+                WorkspaceCommand::Add { name, path } => WorkspaceAdmin::Add {
+                    name,
+                    path: path.to_str().context("path must be UTF-8")?.into(),
+                },
+                WorkspaceCommand::List => WorkspaceAdmin::List,
+                WorkspaceCommand::Grant {
+                    name,
+                    peer,
+                    write,
+                    execute,
+                } => WorkspaceAdmin::Grant {
+                    name,
+                    peer,
+                    write,
+                    execute,
+                },
+                WorkspaceCommand::Revoke { name, peer } => WorkspaceAdmin::Revoke { name, peer },
+                WorkspaceCommand::Remove { name } => WorkspaceAdmin::Remove { name },
+                WorkspaceCommand::Prune => WorkspaceAdmin::Prune,
+            };
+            Request::WorkspaceAdmin { command }
+        }
+        Command::Remote(RemoteCommand::List { node }) => {
+            Request::WorkspaceList { node, lease: None }
+        }
+        Command::Remote(command) => {
+            use WorkspaceOperation as Op;
+            let (node, request) = match command {
+                RemoteCommand::Files {
+                    node,
+                    workspace,
+                    path,
+                } => (node, Op::ListFiles { workspace, path }),
+                RemoteCommand::Read {
+                    node,
+                    workspace,
+                    path,
+                } => (node, Op::ReadFile { workspace, path }),
+                RemoteCommand::Write {
+                    node,
+                    workspace,
+                    path,
+                    content_file,
+                    expected_sha256,
+                } => (
+                    node,
+                    Op::WriteFile {
+                        workspace,
+                        path,
+                        content: std::fs::read_to_string(content_file)?,
+                        expected_sha256,
+                    },
+                ),
+                RemoteCommand::Search {
+                    node,
+                    workspace,
+                    path,
+                    query,
+                } => (
+                    node,
+                    Op::Search {
+                        workspace,
+                        path,
+                        query,
+                    },
+                ),
+                RemoteCommand::Execute {
+                    node,
+                    workspace,
+                    path,
+                    command,
+                    request_id,
+                    timeout_seconds,
+                } => (
+                    node,
+                    Op::Execute {
+                        workspace,
+                        path,
+                        command,
+                        request_id,
+                        timeout_seconds,
+                    },
+                ),
+                RemoteCommand::Job {
+                    node,
+                    job,
+                    stdout_cursor,
+                    stderr_cursor,
+                } => (
+                    node,
+                    Op::Job {
+                        job,
+                        stdout_cursor,
+                        stderr_cursor,
+                    },
+                ),
+                RemoteCommand::Jobs { node, workspace } => (node, Op::Jobs { workspace }),
+                RemoteCommand::Cancel { node, job } => (node, Op::CancelJob { job }),
+                RemoteCommand::List { .. } => unreachable!(),
+            };
+            Request::WorkspaceCall {
+                node,
+                request,
+                lease: None,
+            }
+        }
         Command::Invite(InviteCommand::Create { ttl_seconds }) => {
             setup::ensure_daemon(&dir).await?;
             Request::InviteCreate { ttl_seconds }
@@ -266,16 +520,18 @@ async fn execute(cli: Cli) -> Result<()> {
             no_relay,
             relay_only,
             bind_addr,
+            dns_server,
         }) => {
-            return daemon::run(
+            return daemon::run(daemon::Options {
                 dir,
                 name,
-                relay_url,
+                relay: relay_url,
                 relay_token_file,
                 no_relay,
                 relay_only,
                 bind_addr,
-            )
+                dns_server,
+            })
             .await;
         }
         Command::Mcp(Mcp::Serve {

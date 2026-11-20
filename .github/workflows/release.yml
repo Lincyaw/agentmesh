@@ -63,6 +63,8 @@ jobs:
           python3 tests/test_auto_binding.py
           python3 tests/test_invites.py
           python3 tests/test_interop.py
+          python3 tests/test_remote.py
+          python3 tests/test_transport.py
       - name: Package binary
         run: python3 scripts/package_release.py --binary 'target/${{ matrix.target }}/release/agentmesh' --platform '${{ matrix.platform }}'
       - uses: actions/upload-artifact@v4

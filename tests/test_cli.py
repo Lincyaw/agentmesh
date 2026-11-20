@@ -21,6 +21,9 @@ class CliContract(unittest.TestCase):
                 self.assertNotIn(secret,result.stdout+result.stderr)
     def test_all_help_paths_complete_without_starting_a_daemon(self):
         commands = [[], ['invite'], ['invite', 'create'], ['join'], ['setup'], ['daemon'], ['daemon', 'run'], ['daemon', 'stop'], ['peer'], ['peer', 'ticket'], ['peer', 'add'], ['peer', 'list'], ['session'], ['session', 'list'], ['session', 'attach'], ['mcp'], ['mcp', 'serve'], ['message'], ['message', 'send'], ['message', 'inbox'], ['message', 'ack'], ['message', 'deliveries'], ['group'], ['group', 'set'], ['group', 'list'], ['config'], ['status'], ['relay'], ['relay', 'check']]
+        commands += [['workspace'], ['remote']]
+        commands += [['workspace', action] for action in ['add', 'list', 'grant', 'revoke', 'remove', 'prune']]
+        commands += [['remote', action] for action in ['list', 'files', 'read', 'write', 'search', 'execute', 'job', 'jobs', 'cancel']]
         with tempfile.TemporaryDirectory(prefix='am-cli-', dir='/tmp') as root:
             directory = Path(root) / 'uncreated'
             for command in commands:
@@ -41,6 +44,10 @@ class CliContract(unittest.TestCase):
             self.assertNotEqual(error.returncode, 0)
             self.assertEqual(error.stdout, '')
             self.assertFalse(json.loads(error.stderr)['ok'])
+            invalid = subprocess.run([str(BINARY), '--data-dir', str(directory), 'daemon', 'run', '--name', 'test', '--relay-only'], capture_output=True, text=True, timeout=5)
+            self.assertEqual(invalid.returncode, 2)
+            self.assertIn('--relay-url', invalid.stderr)
+            self.assertFalse(directory.exists())
 
 
 if __name__ == '__main__':

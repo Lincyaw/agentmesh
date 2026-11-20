@@ -1,11 +1,24 @@
 use crate::protocol::{MAX_FRAME, Request, Response};
 use anyhow::{Context, Result, ensure};
 use serde_json::Value;
-use std::path::Path;
+use std::{os::unix::fs::PermissionsExt, path::Path};
 use tokio::{
     io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
 };
+
+pub fn private_dir(dir: &Path) -> Result<()> {
+    std::fs::create_dir_all(dir)?;
+    let metadata = std::fs::symlink_metadata(dir)?;
+    ensure!(
+        metadata.is_dir()
+            && !metadata.file_type().is_symlink()
+            && std::os::unix::fs::MetadataExt::uid(&metadata) == unsafe { libc::geteuid() },
+        "data directory must be owned by current user and not a symlink"
+    );
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    Ok(())
+}
 
 pub async fn read_frame(reader: impl AsyncRead + Unpin) -> Result<Vec<u8>> {
     let mut data = Vec::new();
