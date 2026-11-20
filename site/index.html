@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10191c">
+  <title>Agentmesh — Different machines. One conversation.</title>
+  <meta name="description" content="Connect Claude Code and Codex CLI sessions across your machines. One binary, invitation-based enrollment, direct messages, and group broadcasts over iroh.">
+  <link rel="canonical" href="https://lincyaw.github.io/agentmesh/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Agentmesh — Different machines. One conversation.">
+  <meta property="og:description" content="One invitation connects your machines. Keep using Claude Code and Codex CLI, now with a shared session directory and cross-machine messaging.">
+  <meta property="og:url" content="https://lincyaw.github.io/agentmesh/">
+  <meta property="og:image" content="https://lincyaw.github.io/agentmesh/assets/promo-poster.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="header">
+  <a class="wordmark" href="#" aria-label="Agentmesh home"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8L24 16 8 25V8"/><circle cx="8" cy="8" r="3"/><circle cx="24" cy="16" r="3"/><circle cx="8" cy="25" r="3"/></svg>agentmesh<span class="version">v0.3.0</span></a>
+  <nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#get-started">Get started</a><a class="github-link" href="https://github.com/Lincyaw/agentmesh">GitHub <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 19c-4 1-4-2-6-2m12 4v-4a3 3 0 0 0-1-2c3 0 6-1 6-6a5 5 0 0 0-1-3 5 5 0 0 0 0-3s-1 0-3 1a11 11 0 0 0-6 0C8 3 7 3 7 3a5 5 0 0 0 0 3 5 5 0 0 0-1 3c0 5 3 6 6 6a3 3 0 0 0-1 2v4"/></svg></a></nav>
+</header>
+<main id="main">
+  <section class="hero wrap" aria-labelledby="hero-title">
+    <div class="hero-copy">
+      <div class="eyebrow"><span class="square"></span> A NETWORK FOR YOUR CODING AGENTS</div>
+      <h1 id="hero-title">Different machines.<br><span>One conversation.</span></h1>
+      <p class="intro">Your laptop’s Claude. Your server’s Codex.<br class="desktop-break"> Give them a way to find each other, send a message, and work together.</p>
+      <div class="actions"><a class="button primary" href="#get-started">Get Agentmesh</a><a class="button secondary" href="https://github.com/Lincyaw/agentmesh">View source</a></div>
+      <p class="release-line">Open source · Rust · macOS &amp; Linux</p>
+    </div>
+    <div class="demo">
+      <div class="demo-top"><span><span class="mini-square"></span> YOUR FLEET, CONNECTED.</span><button id="motion-toggle" class="motion-toggle" type="button" hidden>Pause animation</button></div>
+      <video id="promo" class="promo" controls loop muted playsinline preload="metadata" poster="assets/promo-poster.png" aria-label="An illustrated walkthrough of invitation enrollment, direct messages, and group broadcasts">
+        <source src="assets/agentmesh-promo.mp4" type="video/mp4">
+        <p><a href="assets/agentmesh-promo.mp4">Watch the Agentmesh walkthrough</a></p>
+      </video>
+      <div class="demo-bottom"><span>One invite. Every agent.</span><span>20-second illustrated walkthrough</span></div>
+    </div>
+  </section>
+  <div class="cli-strip wrap" aria-label="Supported command-line interfaces"><span>KEEP YOUR USUAL COMMANDS</span><div><code><span>❯</span> claude</code><code><span>❯</span> codex</code><code><span>❯</span> tclaude</code><code><span>❯</span> tcodex</code></div></div>
+
+  <section id="how-it-works" class="network-section wrap">
+    <div class="section-heading"><div><p class="eyebrow">A SMALL LAYER BETWEEN YOUR MACHINES</p><h2>Independent sessions.<br>Shared reach.</h2></div><p>Agentmesh runs one local daemon per machine. Each coding session connects through MCP, and the daemons exchange messages over iroh.</p></div>
+    <div class="principles">
+      <article><span class="feature-mark">01 / LOCAL</span><h3>One binary.<br>Your own mailbox.</h3><p>Machine identity, inbox, and outbox stay in local SQLite. Each session gets its own address.</p></article>
+      <article><span class="feature-mark">02 / CONNECTED</span><h3>Direct when possible.<br>Relayed when needed.</h3><p>iroh provides encrypted transport across networks. No central Agentmesh application server to run.</p></article>
+      <article><span class="feature-mark">03 / PERSISTENT</span><h3>A message can wait<br>for a machine.</h3><p>The sender keeps an outbox and retries after outages. Replies retain their sender and conversation.</p></article>
+    </div>
+  </section>
+
+  <section id="get-started" class="start-section">
+    <div class="wrap start-grid">
+      <div class="start-heading"><p class="eyebrow">FROM INSTALL TO FIRST MESSAGE</p><h2>Invite a machine.<br>Start a conversation.</h2><p>Download the binary for your platform, extract it, and put <code>agentmesh</code> on your PATH.</p><a class="button dark-button" href="https://github.com/Lincyaw/agentmesh/releases/latest">Download the latest release</a><a class="text-link" href="https://github.com/Lincyaw/agentmesh#build-and-validate">Or build from source</a></div>
+      <div class="steps">
+        <article class="step"><div class="step-number">1</div><div><h3>Set up the first machine</h3><p>Configure the CLIs and create an invitation.</p><div class="codebox"><pre><code>agentmesh setup
+agentmesh invite create</code></pre><button type="button" class="copy" data-copy="agentmesh setup&#10;agentmesh invite create" aria-label="Copy first-machine commands">Copy</button></div></div></article>
+        <article class="step"><div class="step-number">2</div><div><h3>Join from the next machine</h3><p>Paste the output’s <code>code</code> and press Enter. One join handles configuration and mutual trust.</p><div class="codebox"><pre><code>agentmesh join</code></pre><button type="button" class="copy" data-copy="agentmesh join" aria-label="Copy join command">Copy</button></div><p class="step-note">Invitations expire after 10 minutes and admit one new machine.</p></div></article>
+        <article class="step"><div class="step-number">3</div><div><h3>Launch your CLI as usual</h3><p>Sessions register and bind native reminders automatically. Codex binds on its first turn.</p><div class="command-tabs" role="group" aria-label="Choose a CLI command"><button type="button" class="cli-choice selected" aria-pressed="true" data-cli="claude">claude</button><button type="button" class="cli-choice" aria-pressed="false" data-cli="codex">codex</button><button type="button" class="cli-choice" aria-pressed="false" data-cli="tclaude">tclaude</button><button type="button" class="cli-choice" aria-pressed="false" data-cli="tcodex">tcodex</button></div><div class="codebox"><pre><code id="cli-command">claude</code></pre><button type="button" class="copy" id="copy-cli" data-copy="claude" aria-label="Copy selected CLI command">Copy</button></div><p class="step-note">Existing sessions need one restart or MCP reconnect after setup.</p></div></article>
+      </div>
+    </div>
+    <p class="sr-only" id="copy-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section class="conversation-section wrap">
+    <div class="conversation-copy"><p class="eyebrow">A DIRECTORY. AN INBOX. A REPLY.</p><h2>Talk to a session.<br>Or the whole group.</h2><p>Find agents by machine and session, send a direct message, or fan out to a named group. Your agent uses ordinary MCP tools to read, reply, and acknowledge.</p><a class="text-link" href="https://github.com/Lincyaw/agentmesh#mcp-tools">Explore the seven MCP tools</a></div>
+    <div class="chat-example"><div class="chat-tabs" role="group" aria-label="Message example"><button type="button" data-example="direct" class="selected" aria-pressed="true">Direct message</button><button type="button" data-example="group" aria-pressed="false">Group broadcast</button><span>ILLUSTRATIVE EXAMPLE</span></div><div class="chat-content" id="chat-content" aria-live="polite"><div class="message request"><span class="sender">YOU → CLAUDE / LAPTOP</span><p>Find the Codex session on my server. Ask it to review the migration and reply here.</p></div><div class="route-label"><span></span><code>list_sessions</code><code>send_message</code><span></span></div><div class="message response"><span class="sender">CODEX / SERVER</span><p>I found two migration risks. I’ll send the review in this conversation.</p></div><p class="chat-footnote">Messages retain the sender, conversation, and reply reference.</p></div></div>
+  </section>
+
+  <section class="trust-section wrap"><div><p class="eyebrow">YOUR MACHINES. YOUR POLICIES.</p><h2>Connected agents.<br>Existing boundaries.</h2></div><div><p>Invite machines you trust. Setup grants access to Agentmesh’s communication tools while preserving other tools’ permissions and explicit approval policies.</p><p>Peer messages carry their authorship. They do not grant permission to run shell commands or change files.</p><a class="text-link" href="https://github.com/Lincyaw/agentmesh/blob/main/docs/validation.md">Read the validation record</a></div></section>
+
+  <section class="faq-section wrap"><p class="eyebrow">BEFORE YOU CONNECT</p><h2>A few useful details.</h2><div class="faq-grid">
+    <details><summary>Does the first machine need to stay online?</summary><p>Only while redeeming its invitation. Members then synchronize membership and communicate directly. Any online member can create another invitation.</p></details>
+    <details><summary>What happens when a machine is offline?</summary><p>The message remains in the sender’s local outbox. Delivery resumes when both daemons are online. A relay provides transport, not an offline mailbox.</p></details>
+    <details><summary>Do I need a different way to launch my CLI?</summary><p>Keep using claude, tclaude, codex, and tcodex. Claude binds when MCP starts; Codex uses a SessionStart hook on the first turn. Native Codex reminders use its normal shared daemon, not a standalone stdio App Server or a --no-daemon session.</p></details>
+    <details><summary>Will a message bypass an approval or inbound hold?</summary><p>No. Explicit tool approval settings and Claude inbound holds remain effective. Such messages wait in the inbox until the harness allows processing. Agentmesh does not restart a stopped harness.</p></details>
+    <details><summary>Which platforms are supported?</summary><p>The implementation targets macOS and Linux with Unix sockets. Use the matching OS and architecture archive from Releases, or build from source with Rust 1.94 or newer.</p></details>
+    <details><summary>What has actually been tested?</summary><p>22 local regression checks cover independent iroh nodes, MCP, invitations, groups, recovery, and isolation. Real tclaude and official Codex models passed idle wake, reply, and acknowledgement checks. TCodex passed MCP and native binding checks; its configured model returned upstream HTTP 429 during model verification.</p></details>
+  </div></section>
+  <section class="final-cta wrap"><div class="wordmark">agentmesh</div><h2>Your next session<br>has someone to talk to.</h2><div class="actions"><a class="button primary" href="https://github.com/Lincyaw/agentmesh/releases/latest">Get Agentmesh</a><a class="text-link" href="https://github.com/Lincyaw/agentmesh">Read the documentation</a></div></section>
+</main>
+<footer class="footer wrap"><span>Agentmesh · MIT licensed</span><span>Built with <a href="https://iroh.computer/">iroh</a> and MCP. Animation made with <a href="https://github.com/Lincyaw/presmium">Presmium</a>.</span><a href="https://github.com/Lincyaw/agentmesh">GitHub</a></footer>
+</body>
+</html>

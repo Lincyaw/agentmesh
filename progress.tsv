@@ -1,0 +1,6 @@
+date	status	rust_checks	interop_checks	cli_checks	description
+2026-11-20	baseline	0	0	0	Architecture and requirement contracts recorded
+2026-11-20	keep	5	6	2	Authenticated iroh and MCP messaging, offline recovery, groups, native adapters and bounded discovery validated
+2026-11-20	keep	5	7	3	Four-CLI shared setup (4 checks), lazy daemon lifecycle, private relay tokens, real tclaude model reply and tcodex MCP/queue verified
+2026-11-20	keep	5	7	3	Invitation mesh (2 checks), automatic native binding (1 check), four-CLI setup (4 checks), real Codex/tclaude idle model reply; tcodex model blocked by upstream 429
+2026-11-20	keep	5	7	3	English README, responsive landing page, 20-second Presmium animation, static asset validation, native release CI; product behavior unchanged

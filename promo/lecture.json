@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "id": "df103c2a-469f-4cea-a79f-7896657272d3",
+  "metadata": {
+    "title": "Agentmesh \u2014 One invite. Every agent.",
+    "lang": "en",
+    "plugins": [
+      "@lincyaw/addon-motion",
+      "@lincyaw/addon-lecture"
+    ],
+    "renderers": {
+      "slides": {
+        "aspectRatio": "8/5",
+        "canvasWidth": 1000
+      },
+      "lecture": {
+        "maximumDurationMs": 21000
+      }
+    }
+  },
+  "sectionOrder": [
+    "intro"
+  ],
+  "sections": {
+    "intro": {
+      "id": "intro",
+      "title": "Different machines. One conversation.",
+      "children": [
+        "network"
+      ],
+      "stepOrder": [
+        "separate",
+        "invite",
+        "message",
+        "broadcast"
+      ],
+      "layout": {
+        "type": "stack",
+        "renderers": {
+          "slides": {
+            "layout": "full"
+          }
+        }
+      }
+    }
+  },
+  "blocks": {
+    "network": {
+      "id": "network",
+      "type": "component",
+      "definitionId": "network-scene",
+      "parameters": {
+        "scene": "network",
+        "alt": "An invitation connects three machines. A private message travels to one session, then a group message reaches multiple recipients.",
+        "copy": {
+          "brand": "agentmesh",
+          "illustration": "ILLUSTRATIVE NETWORK",
+          "alt": "An invitation connects three machines. A private message travels to one session, then a group message reaches multiple recipients.",
+          "headlines": [
+            "Different machines. Your usual agents.",
+            "Invite once. Join the network.",
+            "Send a message. Get a reply.",
+            "One group. Every recipient."
+          ],
+          "commands": [
+            "$ claude   $ tclaude   $ codex   $ tcodex",
+            "$ agentmesh invite create   \u2192   $ agentmesh join",
+            "send_message \u2192 check_inbox \u2192 reply",
+            "send_message(group: \"project-team\")"
+          ],
+          "devices": [
+            "macbook",
+            "server",
+            "workstation"
+          ],
+          "roles": [
+            "claude",
+            "tclaude",
+            "codex",
+            "tcodex"
+          ],
+          "local": "ONE LOCAL DAEMON",
+          "offline": "LOCAL SESSION",
+          "online": "IN THE DIRECTORY",
+          "invite": "INVITATION",
+          "received": "inbox received"
+        },
+        "palette": {
+          "bg": "#10191c",
+          "surface": "#19262a",
+          "ink": "#f0f5ef",
+          "muted": "#91a7a2",
+          "accent": "#b8f275",
+          "line": "#3b514d",
+          "ok": "#b8f275"
+        },
+        "aspect": "8/5"
+      }
+    }
+  },
+  "steps": {
+    "separate": {
+      "id": "separate",
+      "sectionId": "intro",
+      "visuals": [
+        {
+          "blockId": "network",
+          "visible": true,
+          "state": "separate"
+        }
+      ],
+      "narrationIds": []
+    },
+    "invite": {
+      "id": "invite",
+      "sectionId": "intro",
+      "visuals": [
+        {
+          "blockId": "network",
+          "visible": true,
+          "state": "invite"
+        }
+      ],
+      "narrationIds": []
+    },
+    "message": {
+      "id": "message",
+      "sectionId": "intro",
+      "visuals": [
+        {
+          "blockId": "network",
+          "visible": true,
+          "state": "message"
+        }
+      ],
+      "narrationIds": []
+    },
+    "broadcast": {
+      "id": "broadcast",
+      "sectionId": "intro",
+      "visuals": [
+        {
+          "blockId": "network",
+          "visible": true,
+          "state": "broadcast"
+        }
+      ],
+      "narrationIds": []
+    }
+  },
+  "narrations": {},
+  "assets": {},
+  "definitions": {
+    "network-scene": {
+      "id": "network-scene",
+      "kind": "scene",
+      "schemaVersion": 1,
+      "implementation": {
+        "type": "file",
+        "path": "scenes/network.ts"
+      },
+      "parameterSchema": {
+        "type": "object",
+        "properties": {
+          "scene": {
+            "type": "string"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "copy": {
+            "type": "object"
+          },
+          "palette": {
+            "type": "object"
+          },
+          "aspect": {
+            "type": "string"
+          }
+        }
+      },
+      "states": [
+        {
+          "id": "separate"
+        },
+        {
+          "id": "invite"
+        },
+        {
+          "id": "message"
+        },
+        {
+          "id": "broadcast"
+        }
+      ],
+      "data": {
+        "plugin": "presmium.motion",
+        "name": "PmScene",
+        "durations": [
+          5000,
+          5000,
+          5000,
+          5000
+        ],
+        "fallback": {
+          "type": "root",
+          "children": [
+            {
+              "type": "paragraph",
+              "children": [
+                {
+                  "type": "text",
+                  "value": "An invitation connects three machines. A private message travels to one session, then a group message reaches multiple recipients."
+                }
+              ]
+            }
+          ]
+        },
+        "language": "typescript"
+      }
+    }
+  },
+  "production": {
+    "defaults": {
+      "voiceSource": {
+        "type": "none"
+      },
+      "minimumHoldMs": 5000,
+      "trailingPauseMs": 0,
+      "captionVisible": false
+    },
+    "stepOverrides": {},
+    "mediaClips": []
+  }
+}

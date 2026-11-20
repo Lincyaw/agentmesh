@@ -1,0 +1,96 @@
+project:
+  name: agentmesh
+  languages: [rust]
+requirements:
+  - id: REQ-001
+    title: Single binary and private local daemon
+    priority: P0
+    status: tested
+    description: One executable provides a private per-machine daemon and JSON CLI.
+    code: [{path: src/main.rs}, {path: src/local.rs}, {path: src/daemon.rs}]
+    tests: [{path: tests/test_cli.py}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-002
+    title: Authenticated iroh peers
+    priority: P0
+    status: tested
+    description: Persist machine identity and authorize explicitly paired peers.
+    code: [{path: src/daemon.rs}, {path: src/protocol.rs}, {path: src/store.rs}]
+    tests: [{path: src/store.rs}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-003
+    title: Session directory and MCP
+    priority: P0
+    status: tested
+    description: Isolated MCP sessions register, renew leases and discover trusted remote sessions.
+    code: [{path: src/mcp.rs}, {path: src/store.rs}, {path: src/daemon.rs}]
+    tests: [{path: src/store.rs}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-004
+    title: Durable private messages
+    priority: P0
+    status: tested
+    description: Persist inbox and outbox, retry offline deliveries and deduplicate receipts.
+    code: [{path: src/store.rs}, {path: src/daemon.rs}]
+    tests: [{path: src/store.rs}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-005
+    title: Group fanout
+    priority: P0
+    status: tested
+    description: Explicit address groups support durable delivery to local and remote sessions.
+    code: [{path: src/store.rs}, {path: src/mcp.rs}]
+    tests: [{path: src/store.rs}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-006
+    title: Claude and Codex CLI adapters
+    priority: P0
+    status: tested
+    description: Automatically attach native sessions and issue attributed inbox reminders while retaining shell and file approval policies.
+    code: [{path: src/wake.rs}, {path: src/mcp.rs}, {path: src/main.rs}]
+    tests: [{path: tests/test_interop.py}, {path: tests/live_codex.py}, {path: tests/live_claude.py}, {path: tests/live_claude_model.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+
+    notes: tclaude model idle wake, read, reply and acknowledgement verified; codex and tcodex real MCP receive/reply and queue acceptance verified.
+  - id: REQ-007
+    title: Shared setup for four CLI entry points
+    priority: P0
+    status: tested
+    description: Merge four default configuration files, preserve existing settings, install a stable binary and lazily start one local daemon.
+    code: [{path: src/setup.rs}, {path: src/main.rs}, {path: src/mcp.rs}]
+    tests: [{path: tests/test_setup.py}, {path: tests/test_interop.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-008
+    title: Private authenticated relay configuration
+    priority: P1
+    status: tested
+    description: Accept an optional private relay token file without exposing its contents in tickets or errors.
+    code: [{path: src/daemon.rs}, {path: src/main.rs}, {path: src/setup.rs}]
+    tests: [{path: tests/test_cli.py}]
+    docs: [{path: README.md}, {path: docs/validation.md}]
+    notes: Token validation and public relay transport verified; supplied self-hosted relay remains unverified because its hostname does not resolve locally.
+  - id: REQ-009
+    title: Invitation enrollment and automatic fleet discovery
+    priority: P0
+    status: tested
+    description: Expiring single-use invitations admit one authenticated machine with idempotent retries, then gossip membership within a trusted network.
+    code: [{path: src/network.rs}, {path: src/store.rs}, {path: src/daemon.rs}, {path: src/main.rs}]
+    tests: [{path: tests/test_invites.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-010
+    title: Automatic native session binding
+    priority: P0
+    status: tested
+    description: Native Claude environment and Codex lifecycle hooks attach each session automatically and fence all tools to the correct native thread.
+    code: [{path: src/mcp.rs}, {path: src/setup.rs}, {path: src/wake.rs}]
+    tests: [{path: tests/test_auto_binding.py}, {path: tests/test_setup.py}, {path: tests/live_claude_model.py}, {path: tests/live_codex_model.py}, {path: tests/live_codex.py}]
+    docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+    notes: Native bindings and MCP interoperability verified for all four labels; tclaude and official Codex models passed idle reply/ack, while the configured tcodex model returned upstream HTTP 429.
+  - id: REQ-011
+    title: Public documentation, website and releases
+    priority: P1
+    status: tested
+    description: English onboarding, a responsive GitHub Pages site with a reproducible Presmium animation, and native release builds with regression gates.
+    code: [{path: site/index.html}, {path: site/app.js}, {path: promo/lecture.json}, {path: .github/workflows/pages.yml}, {path: .github/workflows/release.yml}, {path: scripts/package_release.py}]
+    tests: [{path: scripts/check_site.py}]
+    docs: [{path: README.md}, {path: promo/README.md}, {path: docs/releases/v0.3.0.md}]

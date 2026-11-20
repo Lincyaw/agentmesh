@@ -1,0 +1,12 @@
+/target/
+/.build/
+/artifacts/runtime/
+/dist/
+__pycache__/
+/promo/.agents/
+/promo/.claude/
+/promo/.mcp.json
+/promo/CLAUDE.md
+/promo/node_modules/
+/promo/dist/
+/promo/.presmium/

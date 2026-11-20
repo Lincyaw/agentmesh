@@ -1,0 +1,14 @@
+{
+  "name": "promo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "presmium dev",
+    "check": "presmium check",
+    "build": "presmium build"
+  },
+  "devDependencies": {
+    "@lincyaw/presmium": "1.0.0-rc.117",
+    "@lincyaw/addon-motion": "1.0.0-rc.117"
+  }
+}
