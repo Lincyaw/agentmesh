@@ -37,7 +37,7 @@ class SharedSetup(unittest.TestCase):
                 thread = threading.Thread(target=serve_old_version, daemon=True)
                 thread.start()
                 try:
-                    for invalid, message in [({'relay_only': True}, 'relay_url'), ({'dns_server': 'invalid'}, 'DNS server')]:
+                    for invalid, message in [({'relay_only': True}, 'relay_url'), ({'dns_server': 'invalid'}, 'DNS server'), ({'relay_url':'https://relay.invalid','relay_resolve':'invalid'},'pinned relay IP'), ({'relay_url':'https://relay.invalid','relay_resolve':'127.0.0.1','dns_server':'127.0.0.1:53'},'conflicts')]:
                         (directory / 'daemon.json').write_text(json.dumps({'name': 'old-daemon', **invalid}))
                         result = subprocess.run([str(BINARY), '--data-dir', str(directory), 'remote', 'list'], capture_output=True, text=True, timeout=10)
                         self.assertNotEqual(result.returncode, 0)

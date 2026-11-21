@@ -65,6 +65,12 @@ jobs:
           python3 tests/test_interop.py
           python3 tests/test_remote.py
           python3 tests/test_transport.py
+      - name: Build a local test relay
+        run: cargo install iroh-relay --version 1.5.0 --features server --locked --debug --root .build/test-relay
+      - name: Verify private bootstrap enrollment
+        env:
+          AGENTMESH_BINARY: ${{ github.workspace }}/target/${{ matrix.target }}/release/agentmesh
+        run: python3 scripts/check_private_relay.py --relay-binary .build/test-relay/bin/iroh-relay --binary "$AGENTMESH_BINARY" --bootstrap-only
       - name: Package binary
         run: python3 scripts/package_release.py --binary 'target/${{ matrix.target }}/release/agentmesh' --platform '${{ matrix.platform }}'
       - uses: actions/upload-artifact@v4

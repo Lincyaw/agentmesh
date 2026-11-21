@@ -70,6 +70,7 @@ pub struct Options {
     pub relay_only: bool,
     pub bind_addr: String,
     pub dns_server: Option<std::net::SocketAddr>,
+    pub relay_resolve: Option<std::net::IpAddr>,
 }
 
 pub async fn run(options: Options) -> Result<()> {
@@ -82,8 +83,13 @@ pub async fn run(options: Options) -> Result<()> {
         relay_only,
         bind_addr,
         dns_server,
+        relay_resolve,
     } = options;
     validate_text(&name, "machine name", 128)?;
+    ensure!(
+        relay_resolve.is_none() || (relay.is_some() && dns_server.is_none()),
+        "relay-resolve requires a relay URL and conflicts with dns-server"
+    );
     ensure!(
         !relay_only || relay.is_some(),
         "relay-only mode requires an explicit relay URL"
@@ -147,6 +153,16 @@ pub async fn run(options: Options) -> Result<()> {
         None => resolver.with_system_defaults(),
     }
     .build();
+    let resolver = if let Some(address) = relay_resolve {
+        crate::relay_dns::pinned(
+            allowed_relay
+                .as_ref()
+                .context("relay-resolve requires an enabled relay")?,
+            address,
+        )?
+    } else {
+        resolver
+    };
     let builder = Endpoint::builder(presets::Minimal)
         .clear_address_lookup()
         .dns_resolver(resolver)
@@ -228,6 +244,30 @@ pub async fn run(options: Options) -> Result<()> {
 }
 
 impl State {
+    async fn sync_peer(&self, peer: Ticket, network: Network) -> Result<()> {
+        let expected = peer.address.id;
+        let value = self
+            .remote(
+                peer,
+                RemoteRequest::NetworkSync {
+                    network,
+                    member: self.ticket(),
+                },
+            )
+            .await?;
+        let mut received: Network = serde_json::from_value(value)?;
+        let current = self.ticket();
+        received
+            .members
+            .retain(|p| p.address.id != current.address.id);
+        received.members.push(current);
+        ensure!(
+            received.members.iter().any(|p| p.address.id == expected),
+            "sync response omitted its sender"
+        );
+        self.db.run(move |db| db.merge_network(received)).await?;
+        Ok(())
+    }
     async fn authorize_lease(&self, lease: Option<ExecutionLease>) -> Result<()> {
         if let Some(lease) = lease {
             self.db
@@ -477,6 +517,16 @@ impl State {
 
     async fn handle(&self, request: Request) -> Result<Value> {
         match request {
+            Request::NetworkRefresh { node } => {
+                let peer = self.resolve_machine(&node).await?;
+                let network = self
+                    .db
+                    .run(|db| db.network())
+                    .await?
+                    .context("network membership required")?;
+                self.sync_peer(peer, network).await?;
+                Ok(json!({"synced":true}))
+            }
             Request::WorkspaceAdmin { mut command } => {
                 match &mut command {
                     WorkspaceAdmin::Grant { peer, .. } | WorkspaceAdmin::Revoke { peer, .. } => {
@@ -837,6 +887,12 @@ async fn wake_loop(state: Arc<State>) {
 async fn network_loop(state: Arc<State>) {
     loop {
         let own = state.ticket();
+        if own.address.is_empty() {
+            // Keep known routes during endpoint startup instead of gossiping an
+            // empty self ticket before the authenticated relay handshake finishes.
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            continue;
+        }
         let network = state
             .db
             .run(move |db| {
@@ -859,31 +915,7 @@ async fn network_loop(state: Arc<State>) {
             let mut jobs = stream::iter(peers.into_iter().map(|peer| {
                 let state = state.clone();
                 let network = network.clone();
-                async move {
-                    let expected = peer.address.id;
-                    let value = state
-                        .remote(
-                            peer,
-                            RemoteRequest::NetworkSync {
-                                network,
-                                member: state.ticket(),
-                            },
-                        )
-                        .await?;
-                    let mut received: Network = serde_json::from_value(value)?;
-                    let current = state.ticket();
-                    // A peer's gossip must never replace our own live connection address.
-                    received
-                        .members
-                        .retain(|p| p.address.id != current.address.id);
-                    received.members.push(current);
-                    ensure!(
-                        received.members.iter().any(|p| p.address.id == expected),
-                        "sync response omitted its sender"
-                    );
-                    state.db.run(move |db| db.merge_network(received)).await?;
-                    anyhow::Ok(())
-                }
+                async move { state.sync_peer(peer, network).await }
             }))
             .buffer_unordered(8);
             while jobs.next().await.is_some() {}

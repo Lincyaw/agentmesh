@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--relay-binary', type=Path, required=True)
     parser.add_argument('--binary', type=Path, default=Path('target/debug/agentmesh'))
+    parser.add_argument('--bootstrap-only', action='store_true')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     relay_binary = args.relay_binary.resolve()
@@ -70,11 +71,12 @@ def main():
                     finally:
                         denied.terminate()
                         denied.wait(timeout=10)
-                for suite in ['test_invites.py', 'test_remote.py', 'test_interop.py']:
+                suites = ['test_bootstrap.py'] if args.bootstrap_only else ['test_invites.py', 'test_remote.py', 'test_interop.py', 'test_bootstrap.py']
+                for suite in suites:
                     subprocess.run(['python3', str(root / 'tests' / suite)], cwd=root,
                                    env=environment, check=True, timeout=240)
                 print(json.dumps({'private_relay': True, 'direct_transports': False,
-                                  'token_auth': True, 'wrong_token_rejected': True, 'suites': 3, 'checks': 20, 'status': 'passed'}))
+                                  'token_auth': True, 'wrong_token_rejected': True, 'suites': len(suites), 'checks': 6 if args.bootstrap_only else 25, 'status': 'passed'}))
             finally:
                 server.terminate()
                 try:

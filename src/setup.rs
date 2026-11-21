@@ -36,7 +36,7 @@ fn read(path: &Path) -> Result<Option<String>> {
     Ok(Some(std::fs::read_to_string(path)?))
 }
 
-fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+pub(crate) fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let parent = path.parent().context("configuration has no parent")?;
     std::fs::create_dir_all(parent)?;
     let temporary = parent.join(format!(".agentmesh-{}.tmp", uuid::Uuid::new_v4()));
@@ -490,7 +490,12 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
     address
         .parse::<std::net::SocketAddr>()
         .context("invalid daemon bind address")?;
-    for field in ["relay_url", "relay_token_file", "dns_server"] {
+    for field in [
+        "relay_url",
+        "relay_token_file",
+        "dns_server",
+        "relay_resolve",
+    ] {
         ensure!(
             profile.get(field).is_none_or(|v| v.is_string()),
             "daemon profile {field} must be a string"
@@ -509,6 +514,20 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
         server
             .parse::<std::net::SocketAddr>()
             .context("invalid daemon DNS server")?;
+    }
+    if let Some(address) = profile["relay_resolve"].as_str() {
+        let address = address
+            .parse::<std::net::IpAddr>()
+            .context("invalid pinned relay IP")?;
+        ensure!(
+            profile.get("dns_server").is_none(),
+            "relay_resolve conflicts with dns_server"
+        );
+        let relay = profile["relay_url"]
+            .as_str()
+            .context("relay_resolve requires relay_url")?
+            .parse()?;
+        crate::relay_dns::pinned(&relay, address)?;
     }
     ensure!(
         profile["relay_only"].as_bool() != Some(true) || profile.get("relay_url").is_some(),
@@ -552,6 +571,7 @@ pub async fn ensure_daemon(dir: &Path) -> Result<()> {
         ("relay_url", "--relay-url"),
         ("relay_token_file", "--relay-token-file"),
         ("dns_server", "--dns-server"),
+        ("relay_resolve", "--relay-resolve"),
     ] {
         if let Some(value) = profile[field].as_str() {
             command.args([flag, value]);

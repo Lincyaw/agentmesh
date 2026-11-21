@@ -11,26 +11,30 @@ Install one binary on each machine, join with an invitation code, and keep using
 
 ## Get started
 
-Download a binary for your platform from [Releases](https://github.com/Lincyaw/agentmesh/releases/latest), extract it, and put `agentmesh` on your `PATH`.
-
-On your first machine:
+On an already connected machine, create a private bootstrap invitation:
 
 ```sh
-agentmesh setup
-agentmesh invite create
+agentmesh invite create --bootstrap
 ```
 
-Copy the `code` from the output.
-On the next machine, run:
+On the new machine, run one command and paste the `amb1_` code:
 
 ```sh
-agentmesh join
+curl -fsSL https://raw.githubusercontent.com/Lincyaw/agentmesh/v0.5.0/scripts/install.sh | sh -s -- --join
 ```
 
-Paste the invitation code and press Enter.
-`join` configures the four supported CLIs, starts the local daemon, and establishes mutual trust.
-Invitations expire after ten minutes by default and admit one new machine.
-The inviting machine must be online during redemption.
+This downloads and verifies a native binary, configures all four CLI integrations,
+connects to your self-hosted relay, joins the network, and publishes a dedicated
+`~/agentmesh-workspace` for the inviting machine. It installs a user service where
+supported. No Rust, Python, manual pairing, or session binding is required.
+
+Bootstrap invitations expire after ten minutes by default and admit one new machine.
+They contain the shared relay credential: keep them private. The relay credential
+remains valid independently of the invitation's expiration. The inviter must be online
+during redemption. Each new machine needs its own code.
+See [One-command enrollment](docs/onboarding.md) for unattended setup and service details.
+Download binaries directly from [Releases](https://github.com/Lincyaw/agentmesh/releases/latest)
+when setting up the first machine; configure its private relay before creating bootstrap codes.
 
 Then launch any of your usual commands:
 
@@ -220,6 +224,7 @@ python3 tests/test_auto_binding.py
 python3 tests/test_cli.py
 python3 tests/test_remote.py
 python3 tests/test_transport.py
+python3 tests/test_bootstrap.py
 ```
 
 The regression suite covers actual iroh nodes and MCP processes, enrollment, session isolation, private messages, replies, groups, offline recovery, duplicate prevention, and bounded pagination.

@@ -3,9 +3,12 @@ mod execution;
 mod local;
 mod mcp;
 mod network;
+mod onboard;
 mod protocol;
+mod relay_dns;
 mod setup;
 mod store;
+mod user_service;
 mod wake;
 mod workspace_files;
 
@@ -44,6 +47,9 @@ enum Command {
         config_root: Option<PathBuf>,
         #[arg(long)]
         name: Option<String>,
+        /// Skip OS user-service installation when redeeming a bootstrap invitation.
+        #[arg(long)]
+        no_service: bool,
     },
     /// Configure the shared Claude/tclaude and Codex/tcodex MCP entries.
     Setup {
@@ -214,6 +220,9 @@ enum InviteCommand {
     Create {
         #[arg(long, default_value_t = 600)]
         ttl_seconds: u64,
+        /// Include private relay configuration and a dedicated controller workspace grant.
+        #[arg(long)]
+        bootstrap: bool,
     },
 }
 
@@ -243,6 +252,9 @@ enum Daemon {
         /// Use this DNS server for relay hostnames instead of system DNS. No public fallback.
         #[arg(long)]
         dns_server: Option<std::net::SocketAddr>,
+        /// Pin the configured relay hostname to this IP, retaining TLS verification.
+        #[arg(long, requires="relay_url", conflicts_with_all=["dns_server","no_relay"])]
+        relay_resolve: Option<std::net::IpAddr>,
     },
 }
 #[derive(Subcommand)]
@@ -469,14 +481,23 @@ async fn execute(cli: Cli) -> Result<()> {
                 lease: None,
             }
         }
-        Command::Invite(InviteCommand::Create { ttl_seconds }) => {
+        Command::Invite(InviteCommand::Create {
+            ttl_seconds,
+            bootstrap,
+        }) => {
             setup::ensure_daemon(&dir).await?;
+            if bootstrap {
+                let result = onboard::invitation(&dir, ttl_seconds).await?;
+                println!("{}", serde_json::to_string_pretty(&result)?);
+                return Ok(());
+            }
             Request::InviteCreate { ttl_seconds }
         }
         Command::Join {
             code_file,
             config_root,
             name,
+            no_service,
         } => {
             use std::io::Read;
             let code = if let Some(path) = code_file {
@@ -494,6 +515,11 @@ async fn execute(cli: Cli) -> Result<()> {
                 )?;
                 code
             };
+            if code.trim().starts_with("amb1_") {
+                let result = onboard::join(&dir, config_root, name, &code, !no_service).await?;
+                println!("{}", serde_json::to_string_pretty(&result)?);
+                return Ok(());
+            }
             network::decode(&code)?;
             setup::install(&dir, config_root, name, false)?;
             setup::ensure_daemon(&dir).await?;
@@ -521,6 +547,7 @@ async fn execute(cli: Cli) -> Result<()> {
             relay_only,
             bind_addr,
             dns_server,
+            relay_resolve,
         }) => {
             return daemon::run(daemon::Options {
                 dir,
@@ -531,6 +558,7 @@ async fn execute(cli: Cli) -> Result<()> {
                 relay_only,
                 bind_addr,
                 dns_server,
+                relay_resolve,
             })
             .await;
         }

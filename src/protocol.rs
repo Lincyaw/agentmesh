@@ -181,6 +181,9 @@ pub struct Outgoing {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Request {
+    NetworkRefresh {
+        node: String,
+    },
     WorkspaceAdmin {
         command: WorkspaceAdmin,
     },

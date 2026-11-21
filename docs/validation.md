@@ -17,6 +17,26 @@ Validated on 20 November 2026 with macOS arm64, Rust, iroh 1.5.0, rmcp 3.11.0, S
 | Official Codex | Automatic binding and idle model exchange passed | Codex 0.169.0-alpha.11.1: two real CLI sessions, target read/reply/ack, other inbox empty. |
 | tcodex | Automatic binding, MCP exchange, and queue submission passed | tcodex 0.1.4 / Codex 0.154.0; the configured model returned upstream HTTP 429 in the model-level test. |
 
+## One-command enrollment (v0.5)
+
+The installer and bootstrap suite covers checksum failure before installation,
+invalid/expired codes before configuration, preservation of an existing relay,
+all four harness configurations, private credential permissions, same-machine retries,
+rejection of a second identity, and immediate controller workspace access.
+Five bootstrap tests plus an incorrect-token check pass through a real local,
+authenticated relay with direct transports disabled.
+
+Independent service tests on macOS verify fresh installation, healthy repeat with
+unchanged PID, stopped-service recovery, and managed daemon PID ownership. An
+invitation expiring during service handoff still completes using authenticated
+membership refresh; it is not redeemed a second time. Temporary jobs are removed.
+A separate Fedora host also passed fresh/healthy/stopped systemd ownership checks,
+literal-dollar argument preservation, and immediate controller file/command access
+through the supplied self-hosted TLS relay using native pinned DNS. No Python DNS
+helper was needed in that isolated installation.
+The original 34 regressions continue to pass. Release automation runs the original
+regressions and the six private-bootstrap checks on every supported native platform.
+
 ## Remote workspace validation (v0.4)
 
 The remote workspace suite passes 10 end-to-end checks using independent iroh nodes

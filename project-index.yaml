@@ -118,3 +118,11 @@ requirements:
     code: [{path: src/daemon.rs}, {path: src/setup.rs}, {path: src/main.rs}]
     tests: [{path: tests/test_transport.py}, {path: tests/test_setup.py}, {path: tests/test_cli.py}, {path: scripts/check_private_relay.py}]
     docs: [{path: README.md}, {path: docs/architecture.md}, {path: docs/validation.md}]
+  - id: REQ-015
+    title: One-command private enrollment
+    priority: P0
+    status: tested
+    description: Download and checksum a pinned binary, provision private relay transport without Python, merge four harness configurations, redeem a single-use invitation, authorize a dedicated controller workspace, and install an optional user service.
+    code: [{path: scripts/install.sh}, {path: src/onboard.rs}, {path: src/user_service.rs}, {path: src/relay_dns.rs}, {path: src/main.rs}, {path: src/setup.rs}]
+    tests: [{path: tests/test_bootstrap.py}, {path: scripts/check_private_relay.py}]
+    docs: [{path: README.md}, {path: docs/onboarding.md}, {path: docs/releases/v0.5.0.md}]
