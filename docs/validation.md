@@ -41,6 +41,30 @@ approved the change. Native thread fencing now covers all 16 tools.
 These harness-label tests exercise real MCP processes, rather than four separate
 model-generation checks. The earlier model validation below applies to messaging.
 
+## Cross-machine deployment (21 November 2026)
+
+Agentmesh v0.4.0 was built offline with Rust 1.94 on a separate Fedora x86_64
+machine and installed as a persistent user service. The macOS arm64 controller
+and Fedora executor both used the same token-protected, self-hosted TLS relay,
+with direct IP transports disabled, public address lookup/publication disabled,
+and public DNS fallback disabled. TLS certificate verification remained enabled.
+
+After the installation SSH connection was closed, a real local MCP client:
+
+- Discovered the authorized workspace and all 16 MCP tools.
+- Created, read, listed and searched a verification file on the remote machine.
+- Executed Python remotely and verified Linux, the expected user ID and workspace path.
+- Read the command result back as a remote file.
+- Retried a command request with the same ID and received the original job.
+- Cancelled a running remote job and observed its terminal cancellation status.
+
+The executor also passed all 10 remote-workspace regression cases and the transport
+privacy regression natively on Linux. Workspace file access was explicitly granted
+to the controller machine for a dedicated directory. Commands run as the executor's
+Unix user; the directory is not an OS shell sandbox. User services and the private
+DNS mapping remain enabled after SSH logout. Deployment addresses, tokens and
+operator configuration are not stored in this repository.
+
 ## Private transport (v0.4)
 
 A real local DNS responder records zero queries for an endpoint using the default
@@ -85,12 +109,11 @@ Historical v0.3 relay-only checks disabled both endpoints' IP transports and pas
 through a public relay. Those checks were performed before the private-only v0.4
 transport policy and are not repeated for this version.
 
-An optional self-hosted relay was previously inspected for TLS and token-based
-authentication. The supplied host became unreachable during isolated offline build preparation;
-SSH and relay TLS handshakes time out. Work on that host was stopped at the user's
-request; current forced-relay checks use a locally hosted relay. No operator credentials or deployment inventory
-are part of this repository. Linux release checks run in the release workflow; consult
-its actual result for a published tag.
+The supplied self-hosted relay has now passed authenticated, certificate-verified
+cross-machine checks as described above. Local loopback relay checks remain a separate
+reproducible fixture. No operator credentials or deployment inventory are part of this
+repository. Linux release checks also run in the release workflow; consult its actual
+result for a published tag.
 
 ## Invitations and native attachment
 
